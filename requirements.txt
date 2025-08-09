@@ -1,4 +1,6 @@
-gradio
+fastapi[all]
+uvicorn
+python-multipart
 google-generativeai
 langchain-community
 langchain
