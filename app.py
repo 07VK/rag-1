@@ -1,5 +1,12 @@
+# app.py
 import os
-import gradio as gr
+import uvicorn
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+import nest_asyncio
+
+# --- LangChain & AI Model Imports ---
 import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.vectorstores import FAISS
@@ -16,53 +23,63 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 class RAGPipeline:
+    """
+    Encapsulates the entire RAG process from document ingestion to question answering.
+    """
     def __init__(self):
         print("Initializing RAG Pipeline...")
-        # Check for GPU availability
+        # Automatically select the device (GPU if available, otherwise CPU)
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"Using device: {device}")
 
-        # State-of-the-art embedding model with GPU support
+        # Use a lightweight, fast sentence-transformer model for embeddings
         model_name = "sentence-transformers/all-MiniLM-L6-v2"
         model_kwargs = {'device': device}
         self.embedding_model = HuggingFaceEmbeddings(
             model_name=model_name,
             model_kwargs=model_kwargs,
-            cache_folder="/tmp/hf_cache"
+            cache_folder="/tmp/hf_cache"  # Cache models for faster startups
         )
+
+        # Configure the Gemini API key from environment variables
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("GEMINI_API_KEY not found. Please set it in Colab Secrets.")
+            raise ValueError("GEMINI_API_KEY environment variable not found.")
         genai.configure(api_key=api_key)
+
+        # Initialize the generative model (Gemini Flash)
         self.generative_model = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash-latest",
             temperature=0.3,
             google_api_key=api_key
         )
+
+        # Initialize state variables
         self.vector_store = None
         self.bm25 = None
         self.documents = None
         self.retrieval_chain = None
-        print("RAG Pipeline Initialized.")
+        print("RAG Pipeline Initialized Successfully.")
 
-    def create_vector_store_from_pdf(self, pdf_file):
-        if not pdf_file:
-            return "Please upload a PDF file first."
-
-        print(f"Processing PDF: {pdf_file.name}")
+    def create_vector_store_from_pdf(self, pdf_bytes: bytes, filename: str):
+        """
+        Processes a PDF file from bytes, creates embeddings, and sets up the retrieval chain.
+        """
+        print(f"Processing PDF: {filename}")
         try:
-            # Extract text with PyMuPDF, preserving structure
-            doc = fitz.open(pdf_file.name)
+            # Open PDF from memory
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
             text = ""
+            # Extract text from each page, preserving some structure
             for page_num, page in enumerate(doc):
                 blocks = page.get_text("blocks")
                 for block in blocks:
-                    block_text = block[4].strip()  # Text is in index 4
+                    block_text = block[4].strip()  # Text is in index 4 of the block tuple
                     if block_text:
                         text += f"[Page {page_num + 1}]\n{block_text}\n\n"
             doc.close()
 
-            # Split text with RecursiveCharacterTextSplitter
+            # Split the extracted text into manageable chunks
             text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=1000,
                 chunk_overlap=100,
@@ -73,32 +90,33 @@ class RAGPipeline:
             self.documents = [Document(page_content=chunk, metadata={"page": chunk.split('\n')[0]}) for chunk in chunks]
             print(f"Split document into {len(self.documents)} chunks.")
 
-            # Create FAISS vector store with GPU support
-            print("Creating vector store with FAISS...")
+            # Create FAISS vector store for semantic search
+            print("Creating FAISS vector store...")
             self.vector_store = FAISS.from_documents(self.documents, self.embedding_model)
 
-            # Create BM25 index for keyword search (CPU-based)
+            # Create BM25 index for keyword search
             tokenized_docs = [doc.page_content.split() for doc in self.documents]
             self.bm25 = BM25Okapi(tokenized_docs)
             print("BM25 index created successfully.")
 
+            # Set up the final retrieval chain
             self.setup_retrieval_chain()
-            return f"PDF '{pdf_file.name}' processed successfully. You can now ask questions."
+            return f"PDF '{filename}' processed successfully. You can now ask questions."
         except Exception as e:
             print(f"Error during PDF processing: {e}")
-            return "An error occurred. Check the console for details."
+            raise HTTPException(status_code=500, detail=f"Error processing PDF: {e}")
 
     def setup_retrieval_chain(self):
+        """
+        Defines the prompt and creates the LangChain retrieval chain.
+        """
         prompt_template = """
-        You are a medical assistant answering questions based on a provided patient document. Use ONLY the information in the context to provide accurate, detailed answers.
-        - Synthesize information from all relevant sections (e.g., history, diagnostics, procedures, labs, medications) to ensure completeness.
-        - Prioritize specific details like numerical values (e.g., lab results, ejection fraction), dates, and procedural outcomes.
-        - For risk-related questions, infer likelihood based on medical history, labs, and clinical findings if explicit data is unavailable.
+        You are an AI assistant answering questions based on a provided document. Use ONLY the information in the context to provide accurate, detailed answers.
+        - Synthesize information from all relevant sections to ensure completeness.
+        - Prioritize specific details like numerical values, dates, and procedural outcomes.
         - If the answer is not in the context, state: "The answer is not available in the provided document."
-        - Format answers clearly, using bullet points for clarity when listing multiple points, and provide enough verbose, detailed, and well-structured responses that fully address the question.
-        - Structure answers with clear sections or bullet points to enhance readability, avoiding vague or repetitive language also EXPLAIN THE MEDICAL TERMS TO NORMAL READABLE LANGUAGE.
-        - Provide a brief explanation of medical terms or procedures to ensure clarity for non-expert readers.
-        - If the answer is not available in the context, clearly state: "The answer is not available in the provided document."
+        - Format answers clearly, using bullet points for lists.
+        - Explain complex terms in simple language for a non-expert.
         <context>
         {context}
         </context>
@@ -115,94 +133,78 @@ class RAGPipeline:
         print("Retrieval chain is set up.")
 
     def answer_question(self, question: str):
-        if not self.retrieval_chain or not self.vector_store or not self.bm25:
-            return "Error: Please process a PDF first."
+        """
+        Performs hybrid search and generates an answer for a given question.
+        """
+        if not all([self.retrieval_chain, self.vector_store, self.bm25]):
+            raise HTTPException(status_code=400, detail="Error: Please process a PDF first.")
         if not question:
-            return "Error: Please provide a question."
+            raise HTTPException(status_code=400, detail="Error: Please provide a question.")
 
         print(f"Received question: {question}")
         try:
-            # Hybrid search: Combine FAISS and BM25
-            # FAISS vector search
+            # Perform hybrid search by combining FAISS (semantic) and BM25 (keyword) results
             faiss_results = self.vector_store.similarity_search_with_score(question, k=10)
-            faiss_docs = [doc for doc, _ in faiss_results]
-            faiss_scores = {doc.page_content: score for doc, score in faiss_results}
-
-            # BM25 keyword search
             tokenized_query = question.split()
             bm25_scores = self.bm25.get_scores(tokenized_query)
-            bm25_top_docs = sorted(
+            bm25_top_docs_with_scores = sorted(
                 [(doc, score) for doc, score in zip(self.documents, bm25_scores) if score > 0],
-                key=lambda x: x[1],
-                reverse=True
+                key=lambda x: x[1], reverse=True
             )[:10]
 
-            # Combine results using page_content for deduplication
-            content_to_doc = {doc.page_content: doc for doc in self.documents}
-            combined_contents = list(set(
-                [doc.page_content for doc, _ in faiss_results] +
-                [doc.page_content for doc, _ in bm25_top_docs]
-            ))
-            combined_docs = [content_to_doc[content] for content in combined_contents]
+            # Combine and deduplicate results
+            combined_docs = {doc.page_content: doc for doc, _ in faiss_results}
+            combined_docs.update({doc.page_content: doc for doc, _ in bm25_top_docs_with_scores})
 
-            # Combine scores (weighted: 0.7 vector, 0.3 keyword)
-            combined_scores = {}
-            for doc in combined_docs:
-                faiss_score = faiss_scores.get(doc.page_content, 0)
-                bm25_score = next((score for d, score in bm25_top_docs if d.page_content == doc.page_content), 0)
-                combined_scores[doc.page_content] = 0.7 * (1 - faiss_score) + 0.3 * bm25_score
+            # Simple re-ranking can be added here if needed. For now, we use the combined context.
+            top_docs = list(combined_docs.values())[:5] # Limit context to top 5 combined results
 
-            # Select top 5 documents based on combined scores
-            top_docs = sorted(
-                combined_docs,
-                key=lambda doc: combined_scores[doc.page_content],
-                reverse=True
-            )[:5]
-
-            # Prepare context for LLM
-            context = "\n".join([doc.page_content for doc in top_docs])
+            context = "\n\n".join([doc.page_content for doc in top_docs])
             response = self.retrieval_chain.invoke({"input": question, "context": context})
             return response['answer']
         except Exception as e:
             print(f"Error answering question: {e}")
-            return "An error occurred. Check the console for details."
+            raise HTTPException(status_code=500, detail=f"Error answering question: {e}")
 
-# Gradio UI
+
+# --- FastAPI App Definition ---
+app = FastAPI()
+
+# Instantiate the pipeline on startup
 rag_pipeline = RAGPipeline()
 
-def process_pdf_interface(file_obj):
-    if file_obj is None:
-        return "Please upload a file.", None, gr.update(visible=False)
-    result = rag_pipeline.create_vector_store_from_pdf(file_obj)
-    chat_visible = "successfully" in result.lower()
-    return result, None, gr.update(visible=chat_visible)
+# Mount directories for static files (CSS, JS) and templates (HTML)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-def chat_interface(user_input, history):
-    history = history or []
-    history.append([user_input, None])
-    answer = rag_pipeline.answer_question(user_input)
-    history[-1][1] = answer
-    return history, ""
+# --- API Endpoints ---
+@app.post("/upload-pdf")
+async def upload_pdf_endpoint(file: UploadFile = File(...)):
+    """Handles PDF file upload and processing."""
+    pdf_bytes = await file.read()
+    try:
+        result_message = rag_pipeline.create_vector_store_from_pdf(pdf_bytes, file.filename)
+        return {"status": "success", "message": result_message}
+    except HTTPException as e:
+        return {"status": "error", "message": e.detail}
 
-with gr.Blocks(theme=gr.themes.Soft()) as demo:
-    gr.Markdown(
-        """
-        1. Upload a PDF document.
-        2. Click "Process PDF".
-        3. Ask questions in the chat box below.
-        """
-    )
-    with gr.Row():
-        pdf_upload = gr.File(label="Upload PDF", file_types=[".pdf"])
-        process_button = gr.Button("Process PDF", variant="primary")
-    status_display = gr.Textbox(label="Status", interactive=False)
-    with gr.Column(visible=False) as chat_area:
-        chatbot = gr.Chatbot(label="Ask Questions About Your Document")
-        question_box = gr.Textbox(label="Your Question", placeholder="Type your question here...")
-        clear_button = gr.Button("Clear Chat")
+@app.post("/ask")
+async def ask_question_endpoint(request_data: dict):
+    """Handles user questions and returns the model's answer."""
+    question = request_data.get("question")
+    try:
+        answer = rag_pipeline.answer_question(question)
+        return {"answer": answer}
+    except HTTPException as e:
+        return {"answer": e.detail}
 
-    process_button.click(fn=process_pdf_interface, inputs=[pdf_upload], outputs=[status_display, chatbot, chat_area])
-    question_box.submit(fn=chat_interface, inputs=[question_box, chatbot], outputs=[chatbot, question_box])
-    clear_button.click(lambda: (None, ""), outputs=[chatbot, question_box])
+@app.get("/", response_class=HTMLResponse)
+async def get_root():
+    """Serves the main index.html page."""
+    with open("templates/index.html") as f:
+        return HTMLResponse(content=f.read(), status_code=200)
 
-demo.launch(server_name="0.0.0.0", server_port=7860)
+# --- Main execution block for running with uvicorn ---
+if __name__ == "__main__":
+    # This allows running the script directly with `python app.py`
+    # The Dockerfile uses a more direct `uvicorn` command.
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,0 +1,47 @@
+%%writefile templates/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClearChartAI</title>
+    <link rel="icon" type="image/jpg" href="static/logo.jpg">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ClearChartAI </h1>
+            <p>Your AI-powered assistant for medical record analysis.</p>
+        </header>
+
+        <main>
+            <div id="upload-section" class="card">
+                <h2>1. Upload Document</h2>
+                <div class="upload-area">
+                    <input type="file" id="pdf-file" accept=".pdf" style="display: none;">
+                    <label for="pdf-file" class="file-label">
+                        <span id="file-name">Drag & Drop PDF here or Click to Select</span>
+                    </label>
+                    <button id="upload-button" class="button">Process PDF</button>
+                </div>
+                <div id="status-message" class="status"></div>
+            </div>
+
+            <div id="chat-section" class="card hidden">
+                <h2>2. Ask a Question</h2>
+                <div id="chat-window" class="chat-window">
+                    </div>
+                <div class="chat-input-area">
+                    <textarea id="question-input" placeholder="e.g., What was the patient's last recorded temperature?" rows="1"></textarea>
+                    <button id="send-button" class="button">Send</button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>
