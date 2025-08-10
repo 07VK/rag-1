@@ -1,47 +1,304 @@
-%%writefile templates/index.html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ClearChartAI</title>
-    <link rel="icon" type="image/jpg" href="static/logo.jpg">
-    <link rel="stylesheet" href="/static/style.css">
+    <title>ClearChartAI Synapse | Refined by Aero</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* --- AERO'S DESIGN SYSTEM (UI/UX REFINEMENT) --- */
+        :root {
+            /* Palette: Calm, professional, and trustworthy. */
+            --bg-gradient: linear-gradient(180deg, #FDFEFF 0%, #F6F8FA 100%);
+            --panel-frosted-glass: rgba(255, 255, 255, 0.6);
+            --accent-calm-blue: #2563EB; /* A deeper, more confident blue */
+            --accent-healthy-green: #05F5A3; 
+            --accent-heart-red: #E11D48; /* A slightly softer, modern red */
+            --text-primary: #111827; /* Darker for better contrast */
+            --text-secondary: #4B5563;
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.07);
+            --shadow-lifted: 0 20px 25px -5px rgba(29, 99, 235, 0.1), 0 8px 10px -6px rgba(29, 99, 235, 0.1);
+            
+            /* Animation: Fluid and natural motion curves. */
+            --animation-curve-elegant: cubic-bezier(0.645, 0.045, 0.355, 1); /* Ease in/out quint */
+            --animation-curve-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* --- Global Styles --- */
+        body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            margin: 0;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- Reusable Components --- */
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: transform 0.3s var(--animation-curve-elegant);
+        }
+        .logo:hover {
+            transform: scale(1.03);
+        }
+
+        .demo-button-wrapper {
+            display: flex;
+            justify-content: center;
+        }
+        /* MODIFIED: Changed button to an anchor tag for linking */
+        .demo-button {
+            display: inline-block;
+            text-decoration: none;
+            background: var(--accent-calm-blue);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 0.9rem 2.2rem;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.4s var(--animation-curve-spring);
+            box-shadow: var(--shadow-medium);
+        }
+        .demo-button:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: var(--shadow-lifted);
+            background: linear-gradient(45deg, var(--accent-calm-blue), #3B82F6);
+        }
+
+        /* --- PAGE 1: "About" Page --- */
+        #about-page {
+            padding: 2rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .about-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 6rem;
+        }
+        
+        .about-section {
+            text-align: center;
+            margin-bottom: 12rem;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 1s var(--animation-curve-elegant), transform 1s var(--animation-curve-elegant);
+        }
+        .about-section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .hero-title {
+            font-size: clamp(3rem, 6vw, 5rem);
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.03em;
+            background: linear-gradient(45deg, var(--text-primary), var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero-subtitle {
+            font-size: 1.3rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 3rem auto;
+            line-height: 1.8;
+        }
+
+        /* REFINED: EKG Animation with stationary heart */
+        .heartbeat-container {
+            width: 100%;
+            height: 250px;
+            position: relative;
+            margin: 2rem 0 5rem 0;
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            border-radius: 24px;
+            border: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            animation: scroll-grid 5s linear infinite;
+        }
+
+        .ekg-line-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 1; }
+        .ekg-path {
+            stroke: var(--accent-healthy-green);
+            stroke-width: 3;
+            fill: none;
+            stroke-dasharray: 2000;
+            stroke-dashoffset: 2000;
+            animation: draw-ekg 5s linear infinite;
+            filter: drop-shadow(0 0 4px var(--accent-healthy-green)) drop-shadow(0 0 10px var(--accent-healthy-green));
+        }
+        
+        #hero-heart {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            color: var(--accent-heart-red);
+            z-index: 2;
+            animation: pulse-heart 2s infinite ease-in-out;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2.5rem;
+            margin-top: 4rem;
+        }
+        .feature-card {
+            background: var(--panel-frosted-glass);
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: left;
+            box-shadow: var(--shadow-soft);
+            transition: transform 0.4s var(--animation-curve-elegant), box-shadow 0.4s var(--animation-curve-elegant);
+        }
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow-medium);
+        }
+        .feature-card .icon {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--accent-calm-blue), var(--accent-healthy-green));
+            padding: 0.8rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+        .feature-card .icon svg { stroke: white; }
+        .feature-card h3 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+        .feature-card p { color: var(--text-secondary); line-height: 1.7; margin: 0;}
+
+        .team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; perspective: 1200px; }
+        .team-card {
+            position: relative; width: 100%; height: 350px;
+            transition: transform 0.8s var(--animation-curve-elegant);
+            transform-style: preserve-3d;
+        }
+        .team-card:hover { transform: rotateY(180deg); }
+        .card-face {
+            position: absolute; width: 100%; height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid var(--border-subtle);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 1.5rem; box-sizing: border-box; box-shadow: var(--shadow-medium);
+        }
+        .card-back { transform: rotateY(180deg); }
+        .team-card img { width: 120px; height: 120px; border-radius: 50%; border: 4px solid white; box-shadow: var(--shadow-medium); margin-bottom: 1rem; }
+
+        /* --- Keyframe Animations --- */
+        @keyframes popIn { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes draw-ekg { to { stroke-dashoffset: -2000; } }
+        
+        @keyframes pulse-heart {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        @keyframes scroll-grid {
+            from { background-position: 0 0; }
+            to { background-position: -80px 0; }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>ClearChartAI </h1>
-            <p>Your AI-powered assistant for medical record analysis.</p>
+
+    <div id="about-page">
+        <header class="about-header">
+            <a href="/" class="logo"> <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#logo-gradient-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 17L12 22L22 17" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12L12 17L22 12" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <defs><linearGradient id="logo-gradient-1" x1="2" y1="7" x2="22" y2="7" gradientUnits="userSpaceOnUse"><stop stop-color="#2563EB"/><stop offset="1" stop-color="#05F5A3"/></linearGradient></defs>
+                </svg>
+                ClearChartAI
+            </a>
         </header>
 
-        <main>
-            <div id="upload-section" class="card">
-                <h2>1. Upload Document</h2>
-                <div class="upload-area">
-                    <input type="file" id="pdf-file" accept=".pdf" style="display: none;">
-                    <label for="pdf-file" class="file-label">
-                        <span id="file-name">Drag & Drop PDF here or Click to Select</span>
-                    </label>
-                    <button id="upload-button" class="button">Process PDF</button>
-                </div>
-                <div id="status-message" class="status"></div>
+        <section class="about-section" id="about-hero">
+            <h1 class="hero-title">Clarity in Complexity.</h1>
+            <p class="hero-subtitle">ClearChartAI's Synapse engine transforms dense medical records into clear, actionable insights. Understand patient histories in seconds, not hours.</p>
+            <div class="heartbeat-container">
+                <svg id="hero-heart" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+                <svg class="ekg-line-svg" viewBox="0 0 1000 250" preserveAspectRatio="none">
+                    <path class="ekg-path" d="M-50,125 h200 l20,-80 l20,80 h20 l20,-120 l20,180 l20,-60 h1000" />
+                </svg>
             </div>
+        </section>
 
-            <div id="chat-section" class="card hidden">
-                <h2>2. Ask a Question</h2>
-                <div id="chat-window" class="chat-window">
-                    </div>
-                <div class="chat-input-area">
-                    <textarea id="question-input" placeholder="e.g., What was the patient's last recorded temperature?" rows="1"></textarea>
-                    <button id="send-button" class="button">Send</button>
+        <section class="about-section" id="about-features">
+            <h2 class="hero-title" style="font-size: 2.8rem;">The Synapse Advantage</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13V22"></path><path d="M5 13V22"></path><path d="M19 13V22"></path><path d="M2 8.82a15 15 0 0 1 20 0"></path><path d="M12 2v6.82"></path></svg></div>
+                    <h3>Instant Understanding</h3>
+                    <p>Our AI reads and structures complex medical jargon, lab results, and physician notes into a simple, chronological summary.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></div>
+                    <h3>Secure & Compliant</h3>
+                    <p>Built on a HIPAA-compliant framework, ensuring patient data is always encrypted, anonymized, and secure.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 9-2 2 4 4 7-7"></path><path d="M20.37 12.12A10 10 0 1 1 12 2a10 10 0 0 1 8.37 10.12Z"></path></svg></div>
+                    <h3>Actionable Insights</h3>
+                    <p>Go beyond summarization. Ask specific questions and get precise answers sourced directly from the document.</p>
                 </div>
             </div>
-        </main>
+        </section>
+
+        <section class="about-section" id="about-team">
+            <h2 class="hero-title" style="font-size: 2.8rem;">The Team</h2>
+            <div class="team-grid">
+                 <div class="team-card"><div class="card-face card-front"><img src="https://placehold.co/200x200/F6F8FA/4B5563?text=ND" alt="Team member" onerror="this.onerror=null;this.src='https://placehold.co/200x200/F6F8FA/4B5563?text=Error';"><h3 style="margin-bottom: 0.5rem;">Nicholas Davis</h3><p style="color: var(--text-secondary); margin:0;">Chief Executive Officer</p></div><div class="card-face card-back"><p>Ph.D. in Computational Linguistics, with a decade of experience building NLP models for healthcare.</p></div></div>
+                 <div class="team-card"><div class="card-face card-front"><img src="https://placehold.co/200x200/F6F8FA/4B5563?text=DS" alt="Team member" onerror="this.onerror=null;this.src='https://placehold.co/200x200/F6F8FA/4B5563?text=Error';"><h3 style="margin-bottom: 0.5rem;">Dhruv Suraj</h3><p style="color: var(--text-secondary); margin:0;">Lead AI Engineer</p></div><div class="card-face card-back"><p>Certified Ethical Hacker and cybersecurity expert specializing in HIPAA and data privacy protocols.</p></div></div>
+                 <div class="team-card"><div class="card-face card-front"><img src="https://placehold.co/200x200/F6F8FA/4B5563?text=VK" alt="Team member" onerror="this.onerror=null;this.src='https://placehold.co/200x200/F6F8FA/4B5563?text=Error';"><h3 style="margin-bottom: 0.5rem;">Vishnu Koraganji</h3><p style="color: var(--text-secondary); margin:0;">Sr Full-Stack AI Engineer</p></div><div class="card-face card-back"><p>A seasoned product leader with a passion for designing intuitive tools that solve complex problems for clinicians.</p></div></div>
+            </div>
+        </section>
+        
+        <div class="demo-button-wrapper" style="margin-bottom: 8rem;">
+            <a href="/demo.html" class="demo-button">Try our Demo AI Synapse</a>
+        </div>
     </div>
-    <script src="/static/script.js"></script>
+    
+    <script>
+        // --- Scroll-based Animations for About Page ---
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.2 });
+
+        document.querySelectorAll('.about-section').forEach(section => {
+            observer.observe(section);
+        });
+    </script>
 </body>
 </html>

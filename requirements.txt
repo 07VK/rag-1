@@ -2,11 +2,14 @@ fastapi[all]
 uvicorn
 python-multipart
 google-generativeai
-langchain-community
 langchain
+langchain-community
 langchain-google-genai
+langchain-huggingface
 faiss-cpu
 pymupdf
 sentence-transformers
 rank_bm25
 torch
+nest_asyncio
+Jinja2 
