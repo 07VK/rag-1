@@ -207,6 +207,34 @@
             transform: translateY(-2px);
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
         }
+
+	/* --- Responsive Design for Mobile --- */
+@media (max-width: 768px) {
+    .app-layout {
+        /* Switch from two columns to a single vertical column */
+        grid-template-columns: 1fr;
+        /* Allow the layout to grow and scroll on mobile */
+        height: auto;
+        padding: 0.5rem; /* Reduce padding on small screens */
+    }
+
+    /* Allow the whole page to scroll on mobile */
+    body {
+        overflow: auto;
+    }
+
+    .glass-panel {
+        /* Ensure panels have a reasonable height when stacked */
+        min-height: 50vh;
+    }
+
+    /* Make the upload portal more compact */
+    .upload-portal {
+        padding: 1rem;
+    }
+}
+
+
     </style>
 </head>
 <body>
@@ -214,7 +242,7 @@
         <section id="upload-section">
             <div class="upload-portal">
                 <!-- Logo is now a clickable link and centered -->
-                <a href="index.html" class="logo-container">
+                <a href="/" class="logo-container">
                         <img src="/static/logo.png" alt="ClearChartAI" class="logo-image">
                         <h1 class="logo-text">ClearChartAI</h1>
                     <p class="logo-subtitle">Understand Your Health. Own Your Future</p>
@@ -234,7 +262,7 @@
                 <aside class="glass-panel source-panel">
                     <header class="panel-header">
                         <!-- Logo in panel header is now a clickable link -->
-                        <a href="index.html" class="logo">
+                        <a href="/" class="logo">
                             <img src="/static/logo.png" alt="ClearChartAI" style="height: 32px; width: auto;">
                             <span>ClearChartAI</span>
                         </a>
@@ -247,7 +275,7 @@
                         </div>
                     <footer class="panel-footer">
                         <div class="input-wrapper">
-                            <textarea id="question-input" placeholder="Ask ClearChartAI" rows="1"></textarea>
+                            <textarea id="question-input" placeholder="Ask Clari" rows="1"></textarea>
                             <button id="send-button" title="Send Message">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 2L11 13" stroke="#4EC7C2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="#4EC7C2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
@@ -257,124 +285,159 @@
             </div>
         </section>
     </div>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const uploadSection = document.getElementById('upload-section');
-            const chatSection = document.getElementById('chat-section');
-            const pdfFileInput = document.getElementById('pdf-file');
-            const fileLabel = document.querySelector('.file-label');
-            const fileNameSpan = document.getElementById('file-name');
-            const uploadButton = document.getElementById('upload-button');
-            const statusMessage = document.getElementById('status-message');
-            const chatWindow = document.getElementById('chat-window');
-            const questionInput = document.getElementById('question-input');
-            const sendButton = document.getElementById('send-button');
-            const sourceList = document.getElementById('source-list');
 
-            let selectedFile = null;
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Get all the necessary HTML elements
+        const uploadSection = document.getElementById('upload-section');
+        const chatSection = document.getElementById('chat-section');
+        const pdfFileInput = document.getElementById('pdf-file');
+        const fileLabel = document.querySelector('.file-label');
+        const fileNameSpan = document.getElementById('file-name');
+        const uploadButton = document.getElementById('upload-button');
+        const statusMessage = document.getElementById('status-message');
+        const chatWindow = document.getElementById('chat-window');
+        const questionInput = document.getElementById('question-input');
+        const sendButton = document.getElementById('send-button');
+        const sourceList = document.getElementById('source-list');
 
-            fileLabel.addEventListener('click', () => pdfFileInput.click());
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => fileLabel.addEventListener(eventName, preventDefaults, false));
-            ['dragenter', 'dragover'].forEach(eventName => fileLabel.addEventListener(eventName, () => fileLabel.classList.add('dragover'), false));
-            ['dragleave', 'drop'].forEach(eventName => fileLabel.addEventListener(eventName, () => fileLabel.classList.remove('dragover'), false));
-            fileLabel.addEventListener('drop', handleDrop, false);
-            pdfFileInput.addEventListener('change', (e) => handleFileSelect(e.target.files));
+        let selectedFile = null;
 
-            function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-            function handleDrop(e) { handleFileSelect(e.dataTransfer.files); }
+        // --- Event listeners for file drag-and-drop and click ---
+        fileLabel.addEventListener('click', () => pdfFileInput.click());
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => fileLabel.addEventListener(eventName, preventDefaults, false));
+        ['dragenter', 'dragover'].forEach(eventName => fileLabel.addEventListener(eventName, () => fileLabel.classList.add('dragover'), false));
+        ['dragleave', 'drop'].forEach(eventName => fileLabel.addEventListener(eventName, () => fileLabel.classList.remove('dragover'), false));
+        fileLabel.addEventListener('drop', handleDrop, false);
+        pdfFileInput.addEventListener('change', (e) => handleFileSelect(e.target.files));
 
-            function handleFileSelect(files) {
-                if (files.length > 0) {
-                    selectedFile = files[0];
-                    if (selectedFile.type === 'application/pdf') {
-                        fileNameSpan.textContent = selectedFile.name;
-                        statusMessage.textContent = '';
-                    } else {
-                        selectedFile = null;
-                        fileNameSpan.textContent = 'Please select a valid PDF file.';
-                    }
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+        function handleDrop(e) { handleFileSelect(e.dataTransfer.files); }
+
+        function handleFileSelect(files) {
+            if (files.length > 0) {
+                selectedFile = files[0];
+                if (selectedFile.type === 'application/pdf') {
+                    fileNameSpan.textContent = selectedFile.name;
+                    statusMessage.textContent = '';
+                } else {
+                    selectedFile = null;
+                    fileNameSpan.textContent = 'Please select a valid PDF file.';
                 }
             }
+        }
 
-            // This is a mock function for the demo.
-            // In a real application, this would involve a server-side call.
-            function mockProcessAndSwitch() {
-                if (!selectedFile) {
-                    updateStatus('Please select a PDF file first.', 'error');
-                    return;
-                }
-                updateStatus('Processing document...', 'loading');
-                uploadButton.disabled = true;
+        // --- CORRECT UPLOAD FUNCTION ---
+        // This function now correctly calls your backend.
+        async function processAndSwitch() {
+            if (!selectedFile) {
+                updateStatus('Please select a PDF file first.', 'error');
+                return;
+            }
+            updateStatus('Processing document...', 'loading');
+            uploadButton.disabled = true;
 
-                setTimeout(() => {
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                // Actually send the file to the /upload-pdf endpoint
+                const response = await fetch('/upload-pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
                     updateStatus('Success! Starting chat...', 'success');
                     uploadSection.classList.add('hidden');
                     chatSection.classList.remove('hidden');
                     addMessageToChat('Bot', 'The document has been processed. You can now ask questions.');
                     addSourcePill(selectedFile.name);
-                    uploadButton.disabled = false;
-                }, 1500);
-            }
-
-            uploadButton.addEventListener('click', mockProcessAndSwitch);
-            sendButton.addEventListener('click', sendQuestion);
-            questionInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendQuestion();
+                } else {
+                    throw new Error(result.message || 'Failed to process PDF.');
                 }
-            });
-
-            function sendQuestion() {
-                const question = questionInput.value.trim();
-                if (!question) return;
-
-                addMessageToChat('You', question);
-                questionInput.value = '';
-                questionInput.style.height = 'auto';
-                const botMessageElement = addMessageToChat('Bot', '', true);
-
-                // Mock bot response
-                setTimeout(() => {
-                    botMessageElement.classList.remove('typing');
-                    const bubble = botMessageElement.querySelector('.message-bubble');
-                    bubble.innerHTML = "This is a mocked response based on your question. In a real application, this would be generated by an AI model.";
-                    chatWindow.scrollTop = chatWindow.scrollHeight;
-                }, 2000);
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                uploadButton.disabled = false;
             }
+        }
 
-            function addMessageToChat(sender, text, isTyping = false) {
-                const messageElement = document.createElement('div');
-                messageElement.classList.add('chat-message', sender.toLowerCase() + '-message');
-                if (isTyping) { messageElement.classList.add('typing'); }
-                const bubble = document.createElement('div');
-                bubble.className = 'message-bubble';
-                bubble.innerHTML = text.replace(/\n/g, '<br>');
-                messageElement.appendChild(bubble);
-                chatWindow.appendChild(messageElement);
+        // --- CORRECT SEND QUESTION FUNCTION ---
+        // This function now correctly calls the /ask endpoint.
+        async function sendQuestion() {
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            addMessageToChat('You', question);
+            questionInput.value = '';
+            questionInput.style.height = 'auto';
+            const botMessageElement = addMessageToChat('Bot', '', true); // Adds typing indicator
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question }),
+                });
+                const result = await response.json();
+                botMessageElement.classList.remove('typing');
+                const bubble = botMessageElement.querySelector('.message-bubble');
+
+                if (response.ok) {
+                    bubble.innerHTML = result.answer.replace(/\n/g, '<br>');
+                } else {
+                    throw new Error(result.answer || 'An error occurred.');
+                }
+            } catch (error) {
+                botMessageElement.querySelector('.message-bubble').textContent = `Error: ${error.message}`;
+            } finally {
                 chatWindow.scrollTop = chatWindow.scrollHeight;
-                return messageElement;
             }
+        }
 
-            function addSourcePill(fileName) {
-                sourceList.innerHTML = ''; // Clear previous pills
-                const pill = document.createElement('div');
-                pill.className = 'source-pill';
-                pill.innerHTML = `<span>📄 ${fileName}</span>`;
-                sourceList.appendChild(pill);
+        // Link the buttons to the correct functions
+        uploadButton.addEventListener('click', processAndSwitch);
+        sendButton.addEventListener('click', sendQuestion);
+
+        // Allow sending with Enter key
+        questionInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendQuestion();
             }
-
-            function updateStatus(message, type) {
-                statusMessage.textContent = message;
-                statusMessage.style.color = type === 'error' ? '#E11D48' : 'var(--text-secondary)';
-            }
-
-            questionInput.addEventListener('input', () => {
-                questionInput.style.height = 'auto';
-                questionInput.style.height = (questionInput.scrollHeight) + 'px';
-            });
         });
-    </script>
+        
+        // --- Helper functions to update the UI ---
+        function addMessageToChat(sender, text, isTyping = false) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('chat-message', sender.toLowerCase() + '-message');
+            if (isTyping) { messageElement.classList.add('typing'); }
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.innerHTML = text.replace(/\n/g, '<br>');
+            messageElement.appendChild(bubble);
+            chatWindow.appendChild(messageElement);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            return messageElement;
+        }
+
+        function addSourcePill(fileName) {
+            sourceList.innerHTML = '';
+            const pill = document.createElement('div');
+            pill.className = 'source-pill';
+            pill.innerHTML = `<span>📄 ${fileName}</span>`;
+            sourceList.appendChild(pill);
+        }
+
+        function updateStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.style.color = type === 'error' ? '#E11D48' : 'var(--text-secondary)';
+        }
+    });
+</script>
+
+         
 </body>
 </html>
