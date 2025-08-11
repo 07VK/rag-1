@@ -3,6 +3,7 @@ import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates # Correct way to serve templates
+from fastapi.staticfiles import StaticFiles  # <-- ADD THIS LINE
 import nest_asyncio
 
 # --- LangChain & AI Model Imports ---
@@ -133,6 +134,9 @@ class RAGPipeline:
 # --- FastAPI App Setup ---
 app = FastAPI()
 
+# 2. ADD THIS LINE TO MOUNT THE STATIC DIRECTORY
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # ADDED: Setup for Jinja2 templates
 templates = Jinja2Templates(directory="templates")
 
@@ -160,14 +164,15 @@ async def upload_pdf_endpoint(file: UploadFile = File(...)):
 async def ask_question_endpoint(request_data: dict):
     question = request_data.get("question")
     try:
+        # This line calls your actual AI pipeline
         answer = rag_pipeline.answer_question(question)
         return {"answer": answer}
     except HTTPException as e:
-        # Re-raise the HTTP exception from the pipeline
-        raise e
+        # This handles errors from the pipeline
+        return {"answer": f"Error: {e.detail}"}
     except Exception as e:
-        # Catch any other unexpected errors
-        raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
+        # This handles any other unexpected errors
+        return {"answer": f"An internal error occurred: {str(e)}"}
 
 # MODIFIED: Serve the main "About" page
 @app.get("/", response_class=HTMLResponse)
@@ -175,12 +180,9 @@ async def get_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 # ADDED: Serve the "Demo" page
-@app.get("/demo", response_class=HTMLResponse)
+@app.get("/demo.html", response_class=HTMLResponse)
 async def get_demo_page(request: Request):
     return templates.TemplateResponse("demo.html", {"request": request})
-
-# Allow nest_asyncio for environments like Google Colab if needed
-nest_asyncio.apply()
 
 # --- Main execution block ---
 if __name__ == "__main__":
