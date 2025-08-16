@@ -8,6 +8,7 @@ export default function Demo() {
   const [sources, setSources] = useState([]);
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState("");
+  const [sessionId, setSessionId] = useState(null); // <-- FIX: Add state for session ID
 
   const chatBodyRef = useRef(null);
 
@@ -24,6 +25,7 @@ export default function Demo() {
       const res = await fetch("/upload-pdf", { method: "POST", body: form });
       const json = await res.json();
       if (res.ok && json.status === "success") {
+        setSessionId(json.session_id); // <-- FIX: Store the session ID from the response
         setStatus("Success! Starting chat...");
         setShowChat(true);
         setMessages([{ sender: "Bot", text: "The document has been processed. You can now ask questions." }]);
@@ -45,7 +47,8 @@ export default function Demo() {
       const res = await fetch("/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q }),
+        // --- FIX: Include the session_id in the request body ---
+        body: JSON.stringify({ question: q, session_id: sessionId }),
       });
       const json = await res.json();
       setMessages((m) => {
@@ -63,7 +66,7 @@ export default function Demo() {
   }
 
   return (
-    <div className="app-container">
+      <div className="app-container">
       {!showChat ? (
         <section id="upload-section" aria-label="Upload PDF to start demo">
           <div className="upload-portal">
@@ -74,9 +77,7 @@ export default function Demo() {
                 <p className="logo-subtitle" style={{ marginTop: 0 }}>Understand Your Health. Own Your Future</p>
               </div>
             </Link>
-
             <p>Begin by uploading a document to activate the workspace.</p>
-
             <label className="upload-area" htmlFor="pdf-file">
               <input id="pdf-file" type="file" accept=".pdf" style={{ display: "none" }}
                      onChange={(e) => e.target.files && setSelectedFile(e.target.files[0])}/>
@@ -84,13 +85,10 @@ export default function Demo() {
                 {selectedFile ? selectedFile.name : "Click or Drag & Drop a PDF"}
               </span>
             </label>
-
             <button className="button" style={{ background: "linear-gradient(to right, var(--medical-teal), var(--medical-teal-dark))", marginTop: "1.5rem", width: "100%" }} onClick={processAndSwitch}>
               Process PDF
             </button>
-
             <div style={{ marginTop: "1rem", textAlign: "center", fontSize: "0.9rem", color: "var(--text-secondary)" }}>{status}</div>
-
             <Link to="/" className="button" style={{ marginTop: "1rem", textDecoration: "none", display: "inline-block" }}>
               ← Back
             </Link>
@@ -112,7 +110,6 @@ export default function Demo() {
                 ))}
               </main>
             </aside>
-
             <main className="glass-panel chat-panel">
               <div ref={chatBodyRef} className="panel-body" id="chat-window">
                 {messages.map((m, idx) => (
