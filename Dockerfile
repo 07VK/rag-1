@@ -21,21 +21,21 @@ FROM python:3.10-slim
 # Set the working directory for the backend
 WORKDIR /app
 
-# Create a non-root user for better security
-RUN addgroup --system app && adduser --system --group app
-USER app
-
-# Copy Python dependencies and install them
+# --- FIX: Install dependencies as root BEFORE switching user ---
+# Copy Python dependencies first to leverage caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the backend code (app.py)
 COPY app.py .
 
-# --- IMPORTANT ---
-# Copy the built static frontend files from the first stage
-# The 'build' folder from React will become the 'static' folder for FastAPI
-COPY --from=frontend-builder /app/frontend/build ./static
+# --- FIX: Copy from the correct 'dist' folder, not 'build' ---
+# The 'dist' folder from Vite/React will become the 'static' folder for FastAPI
+COPY --from=frontend-builder /app/frontend/dist ./static
+
+# --- Now, create and switch to a non-root user for security ---
+RUN addgroup --system app && adduser --system --group app
+USER app
 
 # Expose the port the app runs on
 EXPOSE 8000
