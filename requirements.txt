@@ -6,4 +6,3 @@ pinecone
 pymupdf
 numpy
 pydantic
-jinja2
