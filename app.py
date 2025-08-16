@@ -1,189 +1,185 @@
 import os
 import uvicorn
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates # Correct way to serve templates
-from fastapi.staticfiles import StaticFiles  # <-- ADD THIS LINE
-import nest_asyncio
-
-# --- LangChain & AI Model Imports ---
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+import fitz  # PyMuPDF
+import numpy as np
 import google.generativeai as genai
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema import Document
-import fitz # PyMuPDF
-from rank_bm25 import BM25Okapi
-import torch
-import warnings
+from pinecone import Pinecone
+import uuid
+import time
+from pydantic import BaseModel
 
-# Suppress warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
+# --- 1. Configuration and Initialization ---
 
-# --- RAG Pipeline Class (No Changes Needed) ---
-class RAGPipeline:
-    def __init__(self):
-        print("Initializing RAG Pipeline...")
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        print(f"Using device: {device}")
-        model_name = "sentence-transformers/all-MiniLM-L6-v2"
-        model_kwargs = {'device': device}
-        # Using a temporary cache folder suitable for Docker environments
-        self.embedding_model = HuggingFaceEmbeddings(
-            model_name=model_name,
-            model_kwargs=model_kwargs,
-            cache_folder="/tmp/hf_cache" 
-        )
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable not found.")
-        genai.configure(api_key=api_key)
-        self.generative_model = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash-latest",
-            temperature=0.3,
-            google_api_key=api_key
-        )
-        self.vector_store = None
-        self.bm25 = None
-        self.documents = None
-        self.retrieval_chain = None
-        print("RAG Pipeline Initialized Successfully.")
+# Load environment variables for API keys and Pinecone host
+# In a real server, these should be set in your hosting provider's dashboard
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
+PINECONE_HOST = os.environ.get("PINECONE_HOST")
 
-    def create_vector_store_from_pdf(self, pdf_bytes: bytes, filename: str):
-        print(f"Processing PDF: {filename}")
-        try:
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            text = ""
-            for page_num, page in enumerate(doc):
-                blocks = page.get_text("blocks")
-                for block in blocks:
-                    block_text = block[4].strip()
-                    if block_text:
-                        # Add page metadata directly into the text for context
-                        text += f"[Page {page_num + 1}]\n{block_text}\n\n"
-            doc.close()
+# Validate that all required environment variables are set
+if not all([GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_HOST]):
+    raise ValueError("Missing one or more required environment variables: GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_HOST")
 
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=100,
-                length_function=len,
-                separators=["\n\n", "\n", ". ", " ", ""]
-            )
-            chunks = text_splitter.split_text(text)
-            # Create LangChain Document objects
-            self.documents = [Document(page_content=chunk) for chunk in chunks]
-            
-            print(f"Split document into {len(self.documents)} chunks.")
-            
-            print("Creating FAISS vector store...")
-            self.vector_store = FAISS.from_documents(self.documents, self.embedding_model)
-            
-            tokenized_docs = [doc.page_content.split() for doc in self.documents]
-            self.bm25 = BM25Okapi(tokenized_docs)
-            print("BM25 index created successfully.")
-            
-            self.setup_retrieval_chain()
-            return f"PDF '{filename}' processed successfully. You can now ask questions."
-        except Exception as e:
-            print(f"Error during PDF processing: {e}")
-            raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+# Configure clients
+genai.configure(api_key=GEMINI_API_KEY)
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index(host=PINECONE_HOST)
 
-    def setup_retrieval_chain(self):
-        prompt_template = """You are an AI assistant for ClearChartAI. Your task is to answer questions based on the medical document provided.
-        Instructions:
-        - Use ONLY the information present in the provided context to answer the question.
-        - Synthesize information from all relevant sections to form a complete and coherent answer.
-        - If the answer is not found within the context, you MUST state: "The answer is not available in the provided document." Do not make up information.
-        - Format your answers clearly. Use bullet points for lists if appropriate.
+# --- 2. FastAPI App Setup ---
 
-        <context>
-        {context}
-        </context>
-
-        Question: {input}
-        Answer:"""
-        prompt = PromptTemplate.from_template(prompt_template)
-        Youtube_chain = create_stuff_documents_chain(self.generative_model, prompt)
-        
-        # Using the vector store's retriever
-        retriever = self.vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
-        
-        self.retrieval_chain = create_retrieval_chain(retriever, Youtube_chain)
-        print("Retrieval chain is set up.")
-
-    def answer_question(self, question: str):
-        if not self.retrieval_chain or not self.vector_store:
-            raise HTTPException(status_code=400, detail="Error: A document has not been processed yet. Please upload a PDF first.")
-        if not question:
-            raise HTTPException(status_code=400, detail="Error: Please provide a question.")
-            
-        print(f"Received question: {question}")
-        try:
-            # The retrieval chain now handles fetching context and generating the answer
-            response = self.retrieval_chain.invoke({"input": question})
-            return response.get('answer', "Could not generate an answer.")
-        except Exception as e:
-            print(f"Error answering question: {e}")
-            raise HTTPException(status_code=500, detail=f"Error answering question: {str(e)}")
-
-# --- FastAPI App Setup ---
 app = FastAPI()
 
-# 2. ADD THIS LINE TO MOUNT THE STATIC DIRECTORY
+# Mount the 'static' directory to serve files like images and CSS
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# ADDED: Setup for Jinja2 templates
+# Set up Jinja2 to render HTML templates from the 'templates' directory
 templates = Jinja2Templates(directory="templates")
 
-# Instantiate the pipeline on startup
-rag_pipeline = RAGPipeline()
+# Pydantic model for the /ask endpoint to ensure data is in the correct format
+class AskRequest(BaseModel):
+    question: str
+    session_id: str
 
-# --- API Endpoints ---
-@app.post("/upload-pdf")
-async def upload_pdf_endpoint(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a PDF.")
-    pdf_bytes = await file.read()
+# --- 3. Core RAG Functions ---
+
+def get_gemini_embeddings(texts, model="models/text-embedding-004"):
+    """Generates embeddings for a list of texts using the Gemini API."""
     try:
-        # Re-initialize the pipeline for the new document
-        # This ensures each upload is a fresh session
-        global rag_pipeline
-        rag_pipeline = RAGPipeline()
-        result_message = rag_pipeline.create_vector_store_from_pdf(pdf_bytes, file.filename)
-        return {"status": "success", "message": result_message}
+        return genai.embed_content(model=model, content=texts)["embedding"]
     except Exception as e:
-        # Catch potential exceptions from pipeline creation as well
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error embedding content: {e}. Retrying...")
+        time.sleep(1)
+        return genai.embed_content(model=model, content=texts)["embedding"]
 
-@app.post("/ask")
-async def ask_question_endpoint(request_data: dict):
-    question = request_data.get("question")
-    try:
-        # This line calls your actual AI pipeline
-        answer = rag_pipeline.answer_question(question)
-        return {"answer": answer}
-    except HTTPException as e:
-        # This handles errors from the pipeline
-        return {"answer": f"Error: {e.detail}"}
-    except Exception as e:
-        # This handles any other unexpected errors
-        return {"answer": f"An internal error occurred: {str(e)}"}
+def layout_aware_chunking(pdf_bytes: bytes):
+    """Extracts text from PDF bytes respecting paragraphs and layout blocks."""
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    chunks = []
+    for page in doc:
+        text_blocks = page.get_text("blocks")
+        for block in text_blocks:
+            block_text = block[4].strip()
+            if len(block_text) > 50:  # Filter out very short, likely irrelevant blocks
+                chunks.append(block_text)
+    doc.close()
+    print(f"Document split into {len(chunks)} layout-aware chunks.")
+    return chunks
 
-# MODIFIED: Serve the main "About" page
+# --- 4. API Endpoints ---
+
 @app.get("/", response_class=HTMLResponse)
 async def get_root(request: Request):
+    """Serves the main index.html page."""
     return templates.TemplateResponse("index.html", {"request": request})
 
-# ADDED: Serve the "Demo" page
 @app.get("/demo.html", response_class=HTMLResponse)
 async def get_demo_page(request: Request):
+    """Serves the demo.html chat page."""
     return templates.TemplateResponse("demo.html", {"request": request})
 
-# --- Main execution block ---
+@app.post("/upload-pdf")
+async def upload_pdf_endpoint(file: UploadFile = File(...)):
+    """
+    Handles PDF upload, processing, and embedding.
+    Returns a unique session_id for the chat.
+    """
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a PDF.")
+
+    session_id = str(uuid.uuid4())
+    pdf_bytes = await file.read()
+    
+    try:
+        chunks = layout_aware_chunking(pdf_bytes)
+        ttl_in_seconds = 43200  # 12 hours
+        batch_size = 100
+
+        for i in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[i:i + batch_size]
+            batch_ids = [f"{session_id}-{i+j}" for j in range(len(batch_chunks))]
+            
+            embeddings = get_gemini_embeddings(batch_chunks)
+            
+            vectors_to_upsert = []
+            for j, (chunk_text, embedding) in enumerate(zip(batch_chunks, embeddings)):
+                vectors_to_upsert.append({
+                    "id": batch_ids[j],
+                    "values": embedding,
+                    "metadata": {"text": chunk_text}
+                })
+            
+            index.upsert(vectors=vectors_to_upsert, ttl=ttl_in_seconds)
+            print(f"Upserted batch {i//batch_size + 1} with a 12-hour TTL.")
+
+        return {"status": "success", "message": "PDF processed successfully.", "session_id": session_id}
+
+    except Exception as e:
+        print(f"Error during PDF processing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/ask")
+async def ask_question_endpoint(request_data: AskRequest):
+    """
+    Receives a question and session_id, retrieves context, and generates an answer.
+    """
+    question = request_data.question
+    session_id = request_data.session_id
+
+    if not question or not session_id:
+        raise HTTPException(status_code=400, detail="Question and session_id are required.")
+
+    try:
+        question_embedding = get_gemini_embeddings([question])[0]
+        query_results = index.query(vector=question_embedding, top_k=4, include_metadata=True)
+        
+        context_chunks = [
+            match['metadata']['text'] 
+            for match in query_results['matches'] 
+            if match['id'].startswith(session_id)
+        ]
+        
+        if not context_chunks:
+            return {"answer": "I could not find relevant information in the uploaded document for this session."}
+            
+        context = "\n---\n".join(context_chunks)
+
+        prompt = f"""
+        **Your Role and Instructions:**
+        You are a helpful AI assistant designed to explain information from medical documents in a simple and clear way. Your tone should always be gentle and reassuring.
+
+        **Core Rules:**
+        1.  **Strictly Grounded:** Base your entire answer ONLY on the information found in the "Context" provided below. Do not add any outside information.
+        2.  **No Hallucinations:** If the answer is not in the context, you MUST state: "I could not find information about that in this document."
+        3.  **NO DIAGNOSIS OR ADVICE:** You MUST NOT provide any form of diagnosis, medical advice, or treatment suggestions. Your role is to explain the information present, not to interpret it for the user's personal health.
+
+        **Response Formatting Rules:**
+        1.  **Simple Language:** When you encounter a medical term, you must explain it in very simple terms, as if you were talking to a 5-year-old.
+        2.  **Provide Context:** After explaining a term or result, you must add context by explaining what a "regular condition would be for an average person."
+        3.  **Word Count:** Keep the total response length under 100 words.
+
+        ---
+        **Context from the Document:**
+        {context}
+        ---
+
+        **Question:**
+        {question}
+
+        **Answer:**
+        """
+
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        response = model.generate_content(prompt)
+        return {"answer": response.text}
+
+    except Exception as e:
+        print(f"Error answering question: {e}")
+        raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
+
+# --- 5. Main execution block (for local testing) ---
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
