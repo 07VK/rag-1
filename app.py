@@ -1,10 +1,9 @@
 import os
 import uvicorn
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Depends
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-import fitz  # PyMuPDF
+import fitz
 import numpy as np
 import google.generativeai as genai
 from pinecone import Pinecone
@@ -13,32 +12,20 @@ import time
 from pydantic import BaseModel
 
 # --- 1. Configuration and Initialization ---
-
-# Load environment variables for API keys and Pinecone host
-# In a real server, these should be set in your hosting provider's dashboard
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 PINECONE_HOST = os.environ.get("PINECONE_HOST")
 
-# Validate that all required environment variables are set
 if not all([GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_HOST]):
-    raise ValueError("Missing one or more required environment variables: GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_HOST")
+    raise ValueError("Missing one or more required environment variables")
 
-# Configure clients
 genai.configure(api_key=GEMINI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(host=PINECONE_HOST)
 
 # --- 2. FastAPI App Setup ---
-
 app = FastAPI()
 
-# Mount the 'static' directory to serve files like images and CSS
-app.mount("/static", StaticFiles(directory="static"), name="static")
-# Set up Jinja2 to render HTML templates from the 'templates' directory
-templates = Jinja2Templates(directory="templates")
-
-# Pydantic model for the /ask endpoint to ensure data is in the correct format
 class AskRequest(BaseModel):
     question: str
     session_id: str
@@ -70,16 +57,6 @@ def layout_aware_chunking(pdf_bytes: bytes):
 
 # --- 4. API Endpoints ---
 
-@app.get("/", response_class=HTMLResponse)
-async def get_root(request: Request):
-    """Serves the main index.html page."""
-    return templates.TemplateResponse("index.html", {"request": request})
-
-@app.get("/demo.html", response_class=HTMLResponse)
-async def get_demo_page(request: Request):
-    """Serves the demo.html chat page."""
-    return templates.TemplateResponse("demo.html", {"request": request})
-
 @app.post("/upload-pdf")
 async def upload_pdf_endpoint(file: UploadFile = File(...)):
     """
@@ -94,7 +71,7 @@ async def upload_pdf_endpoint(file: UploadFile = File(...)):
     
     try:
         chunks = layout_aware_chunking(pdf_bytes)
-        ttl_in_seconds = 43200  # 12 hours
+        ttl_in_seconds = 3600  # 1 hr
         batch_size = 100
 
         for i in range(0, len(chunks), batch_size):
@@ -112,7 +89,7 @@ async def upload_pdf_endpoint(file: UploadFile = File(...)):
                 })
             
             index.upsert(vectors=vectors_to_upsert, ttl=ttl_in_seconds)
-            print(f"Upserted batch {i//batch_size + 1} with a 12-hour TTL.")
+            print(f"Upserted batch {i//batch_size + 1} with a 1-hour TTL.")
 
         return {"status": "success", "message": "PDF processed successfully.", "session_id": session_id}
 
@@ -180,6 +157,21 @@ async def ask_question_endpoint(request_data: AskRequest):
         print(f"Error answering question: {e}")
         raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
 
-# --- 5. Main execution block (for local testing) ---
+
+# --- 5. Static Files and Catch-All Route ---
+
+# This serves files like CSS, JS, and images from the 'static' directory,
+# which is where your Dockerfile places the built React app.
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/{catch_all:path}", response_class=FileResponse)
+async def serve_react_app(catch_all: str):
+    """
+    This catch-all route serves the React app's index.html file for any path
+    that is not an API route. This allows React Router to handle the navigation.
+    """
+    return FileResponse("static/index.html")
+
+# --- 6. Main execution block (for local testing) ---
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
