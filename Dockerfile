@@ -1,41 +1,44 @@
-# --- Stage 1: Build Stage ---
-# Use a full Python image to build dependencies, which may have system requirements.
-FROM python:3.10 as builder
+# --- Stage 1: Build the React Frontend ---
+# Use a Node.js base image to build the static assets
+FROM node:18-alpine as frontend-builder
 
-# Set the working directory
-WORKDIR /app
+# Set the working directory for the frontend
+WORKDIR /app/frontend
 
-# Install build dependencies if any (e.g., for packages that compile from source)
-# RUN apt-get update && apt-get install -y build-essential
+# Copy package.json and package-lock.json to leverage Docker caching
+COPY frontend/package*.json ./
+RUN npm install
 
-# Copy only the requirements file first to leverage Docker's layer caching.
-# This layer will only be rebuilt if requirements.txt changes.
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Copy the rest of the frontend code and build the static files
+COPY frontend/ .
+RUN npm run build
 
 
-# --- Stage 2: Final Runtime Stage ---
-# Use the slim base image for the final, smaller application image.
+# --- Stage 2: Build the Python Backend ---
+# Use a Python base image for the final application
 FROM python:3.10-slim
 
-# Set the working directory
+# Set the working directory for the backend
 WORKDIR /app
 
-# Create a non-root user to run the application for better security
+# Create a non-root user for better security
 RUN addgroup --system app && adduser --system --group app
 USER app
 
-# Copy the installed packages from the builder stage
-COPY --from=builder /root/.local /home/app/.local
+# Copy Python dependencies and install them
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
-COPY . .
+# Copy the backend code (app.py)
+COPY app.py .
 
-# Ensure the app user can run the server
-ENV PATH="/home/app/.local/bin:${PATH}"
+# --- IMPORTANT ---
+# Copy the built static frontend files from the first stage
+# The 'build' folder from React will become the 'static' folder for FastAPI
+COPY --from=frontend-builder /app/frontend/build ./static
 
 # Expose the port the app runs on
 EXPOSE 8000
 
-# The command to run when the container starts
+# The command to run the Uvicorn server
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
