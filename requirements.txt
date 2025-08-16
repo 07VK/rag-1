@@ -2,7 +2,7 @@ fastapi
 uvicorn
 python-multipart
 google-generativeai
-pinecone-client
+pinecone
 pymupdf
 numpy
 pydantic
