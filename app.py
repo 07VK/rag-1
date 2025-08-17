@@ -3,7 +3,7 @@ import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-import fitz
+import fitz  # PyMuPDF
 import numpy as np
 import google.generativeai as genai
 from pinecone import Pinecone
@@ -12,16 +12,28 @@ import time
 from pydantic import BaseModel
 
 # --- 1. Configuration and Initialization ---
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
-PINECONE_HOST = os.environ.get("PINECONE_HOST")
+try:
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
+    PINECONE_HOST = os.environ.get("PINECONE_HOST")
 
-if not all([GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_HOST]):
-    raise ValueError("Missing one or more required environment variables")
+    if not all([GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_HOST]):
+        raise ValueError("CRITICAL: Missing one or more required environment variables")
 
-genai.configure(api_key=GEMINI_API_KEY)
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index(host=PINECONE_HOST)
+    print("INFO: All environment variables found. Initializing services...")
+    
+    genai.configure(api_key=GEMINI_API_KEY)
+    print("INFO: Gemini configured successfully.")
+    
+    pc = Pinecone(api_key=PINECONE_API_KEY)
+    print("INFO: Pinecone client initialized.")
+    
+    index = pc.Index(host=PINECONE_HOST)
+    print("SUCCESS: Connected to Pinecone index.")
+
+except Exception as e:
+    print(f"FATAL: Application failed to start. Error: {e}")
+    raise
 
 # --- 2. FastAPI App Setup ---
 app = FastAPI()
@@ -41,19 +53,49 @@ def get_gemini_embeddings(texts, model="models/text-embedding-004"):
         time.sleep(1)
         return genai.embed_content(model=model, content=texts)["embedding"]
 
-def layout_aware_chunking(pdf_bytes: bytes):
-    """Extracts text from PDF bytes respecting paragraphs and layout blocks."""
+def layout_aware_chunking(pdf_bytes: bytes, min_chunk_chars=250, max_chunk_chars=1000):
+    """
+    Extracts text from a PDF and groups it into semantically meaningful chunks
+    based on layout, aiming for a target size range. This is more efficient
+    than creating a vector for every small text block.
+    """
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     chunks = []
+    current_chunk = ""
+
     for page in doc:
-        text_blocks = page.get_text("blocks")
-        for block in text_blocks:
+        # Sort blocks by vertical position to maintain reading order
+        blocks = sorted(page.get_text("blocks"), key=lambda b: b[1])
+        
+        for block in blocks:
             block_text = block[4].strip()
-            if len(block_text) > 50:  # Filter out very short, likely irrelevant blocks
-                chunks.append(block_text)
-    doc.close()
-    print(f"Document split into {len(chunks)} layout-aware chunks.")
-    return chunks
+            if not block_text:
+                continue
+
+            # If the current chunk is reasonably large and we hit a new paragraph,
+            # finalize the current chunk.
+            if len(current_chunk) > min_chunk_chars and block_text.startswith((" ", "\n")):
+                chunks.append(current_chunk)
+                current_chunk = ""
+
+            # If adding the new block would make the chunk too large,
+            # finalize the current chunk and start a new one.
+            if len(current_chunk) + len(block_text) + 1 > max_chunk_chars:
+                chunks.append(current_chunk)
+                current_chunk = block_text
+            else:
+                current_chunk += " " + block_text
+
+    # Add the last remaining chunk if it exists
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    # Filter out any chunks that are still too small
+    final_chunks = [chunk for chunk in chunks if len(chunk) > min_chunk_chars]
+    
+    print(f"Document split into {len(final_chunks)} semantically grouped chunks.")
+    return final_chunks
+
 
 # --- 4. API Endpoints ---
 
@@ -70,7 +112,12 @@ async def upload_pdf_endpoint(file: UploadFile = File(...)):
     pdf_bytes = await file.read()
     
     try:
+        # Use the new, more efficient chunking function
         chunks = layout_aware_chunking(pdf_bytes)
+        
+        if not chunks:
+             raise HTTPException(status_code=400, detail="Could not extract any meaningful content from the PDF.")
+
         ttl_in_seconds = 3600  # 1 hr
         batch_size = 100
 
@@ -103,11 +150,21 @@ async def ask_question_endpoint(request_data: AskRequest):
     """
     Receives a question and session_id, retrieves context, and generates an answer.
     """
-    question = request_data.question
+    question = request_data.question.strip().lower()
     session_id = request_data.session_id
 
     if not question or not session_id:
         raise HTTPException(status_code=400, detail="Question and session_id are required.")
+
+    # Conversational Handling
+    greetings = ["hello", "hi", "hey", "yo", "greetings"]
+    gratitude = ["thanks", "thank you", "thx", "appreciate it", "ok", "sounds good"]
+
+    if question in greetings:
+        return {"answer": "Hello! I'm ready to help. What would you like to know about this document?"}
+    
+    if question in gratitude:
+        return {"answer": "You're welcome! Let me know if you have any other questions."}
 
     try:
         question_embedding = get_gemini_embeddings([question])[0]
@@ -129,7 +186,7 @@ async def ask_question_endpoint(request_data: AskRequest):
         You are a helpful AI assistant designed to explain information from medical documents in a simple and clear way. Your tone should always be gentle and reassuring.
 
         **Core Rules:**
-        1.  **Strictly Grounded:** Base your entire answer ONLY on the information found in the "Context" provided below. Do not add any outside information.
+        1.  Base your entire answer ONLY on the information found in the "Context" provided below. Do not add any outside information.
         2.  **No Hallucinations:** If the answer is not in the context, you MUST state: "I could not find information about that in this document."
         3.  **NO DIAGNOSIS OR ADVICE:** You MUST NOT provide any form of diagnosis, medical advice, or treatment suggestions. Your role is to explain the information present, not to interpret it for the user's personal health.
 
@@ -159,9 +216,6 @@ async def ask_question_endpoint(request_data: AskRequest):
 
 
 # --- 5. Static Files and Catch-All Route ---
-
-# This serves files like CSS, JS, and images from the 'static' directory,
-# which is where your Dockerfile places the built React app.
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/{catch_all:path}", response_class=FileResponse)

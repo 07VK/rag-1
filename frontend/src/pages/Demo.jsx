@@ -69,6 +69,7 @@ export default function Demo() {
       const res = await fetch("/upload-pdf", { method: "POST", body: form });
       const json = await res.json();
       if (res.ok && json.status === "success") {
+        setSessionId(json.session_id); 
         setStatus("Success! Starting chat...");
         setShowChat(true);
         setMessages([
