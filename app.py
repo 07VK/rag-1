@@ -19,9 +19,22 @@ PINECONE_HOST = os.environ.get("PINECONE_HOST")
 if not all([GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_HOST]):
     raise ValueError("Missing one or more required environment variables")
 
-genai.configure(api_key=GEMINI_API_KEY)
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index(host=PINECONE_HOST)
+# app.py (Revert the commenting from Step 1, then add this block)
+try:
+    print("INFO: Initializing services...")
+    genai.configure(api_key=GEMINI_API_KEY)
+    print("INFO: Gemini configured.")
+    
+    pc = Pinecone(api_key=PINECONE_API_KEY)
+    print("INFO: Pinecone client initialized. Connecting to index...")
+    
+    index = pc.Index(host=PINECONE_HOST)
+    print("SUCCESS: Connected to Pinecone index.")
+
+except Exception as e:
+    # This will print the actual connection error to your logs
+    print(f"FATAL: Application failed to start during service initialization. Error: {e}")
+    raise
 
 # --- 2. FastAPI App Setup ---
 app = FastAPI()
@@ -175,3 +188,4 @@ async def serve_react_app(catch_all: str):
 # --- 6. Main execution block (for local testing) ---
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+
