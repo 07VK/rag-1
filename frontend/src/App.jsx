@@ -11,8 +11,8 @@ export default function App() {
         <Route path="/demo" element={<Demo />} />
       </Routes>
 
-      <footer className="mx-auto max-w-6xl px-6 py-10 text-xs text-slate-400 text-center">
-        © 2025 ClearChartAI. Inc.,
+      <footer className="site-footer">
+        © {new Date().getFullYear()} ClearChartAI, Inc.
       </footer>
     </>
   );
