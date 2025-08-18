@@ -725,32 +725,48 @@
   color: var(--slate-600);
 }
 
-  #send-button {
-    background: none;
-    border: none;
-    cursor: pointer;
+.upload-area {
+  border: 2px dashed var(--border-subtle);
+  border-radius: 12px;
+  padding: 28px;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+  background: rgba(255,255,255,.6);
+}
+.upload-area:hover { border-color: var(--accent-calm-blue); }
+
+.upload-area.drag-active {
+  background: rgba(78,199,194,.08);
+  border-color: var(--medical-teal);
+  box-shadow: 0 0 0 4px rgba(78,199,194,.15);
+}
+
+#send-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: background-color 0.2s ease,
+    transform 0.3s var(--animation-curve-spring);
+}
+#send-button:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.05);
+  transform: scale(1.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    height: auto;
     padding: 0.5rem;
-    border-radius: 50%;
-    transition: background-color 0.2s ease,
-      transform 0.3s var(--animation-curve-spring);
   }
-  #send-button:hover:not(:disabled) {
-    background-color: rgba(0, 0, 0, 0.05);
-    transform: scale(1.1);
+  .glass-panel {
+    min-height: 50vh;
   }
-  
-  /* Responsive */
-  @media (max-width: 768px) {
-    .app-layout {
-      grid-template-columns: 1fr;
-      height: auto;
-      padding: 0.5rem;
-    }
-    .glass-panel {
-      min-height: 50vh;
-    }
-    .app-container {
-      min-height: auto;
-    }
+  .app-container {
+    min-height: auto;
   }
+}
   
