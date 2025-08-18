@@ -38,18 +38,16 @@ except Exception as e:
 # --- 2. FastAPI App Setup ---
 app = FastAPI()
 
-# --- NEW: Pydantic model for a single chat message ---
 class ChatMessage(BaseModel):
     sender: str
     text: str
 
-# --- UPDATED: Pydantic model for the /ask request ---
 class AskRequest(BaseModel):
     question: str
     session_id: str
     history: list[ChatMessage]
 
-# --- 3. Core RAG Functions (No changes here) ---
+# --- 3. Core RAG Functions ---
 
 def get_gemini_embeddings(texts, model="models/text-embedding-004"):
     try:
@@ -59,7 +57,7 @@ def get_gemini_embeddings(texts, model="models/text-embedding-004"):
         time.sleep(1)
         return genai.embed_content(model=model, content=texts)["embedding"]
 
-def layout_aware_chunking(pdf_bytes: bytes, min_chunk_chars=1000, max_chunk_chars=2000):
+def layout_aware_chunking(pdf_bytes: bytes, min_chunk_chars=250, max_chunk_chars=1000):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     chunks = []
     current_chunk = ""
@@ -116,7 +114,6 @@ async def upload_pdf_endpoint(file: UploadFile = File(...)):
         print(f"Error during PDF processing: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- UPDATED: /ask endpoint to handle chat history ---
 @app.post("/ask")
 async def ask_question_endpoint(request_data: AskRequest):
     question = request_data.question.strip().lower()
@@ -128,55 +125,52 @@ async def ask_question_endpoint(request_data: AskRequest):
 
     greetings = ["hello", "hi", "hey", "yo", "greetings"]
     gratitude = ["thanks", "thank you", "thx", "appreciate it", "ok", "sounds good"]
-
     if question in greetings:
-        return {"answer": "Hello! I'm Clari, ready to help. What would you like to know about this document?"}
-    
+        return {"answer": "Hello! I'm ready to help. What would you like to know about this document?"}
     if question in gratitude:
         return {"answer": "You're welcome! Let me know if you have any other questions."}
 
     try:
         question_embedding = get_gemini_embeddings([question])[0]
-        query_results = index.query(vector=question_embedding, top_k=4, include_metadata=True)
-        
-        context_chunks = [
-            match['metadata']['text'] 
-            for match in query_results['matches'] 
-            if match['id'].startswith(session_id)
-        ]
-        
+        # --- IMPROVEMENT: Retrieve slightly more context ---
+        query_results = index.query(vector=question_embedding, top_k=5, include_metadata=True)
+        context_chunks = [match['metadata']['text'] for match in query_results['matches'] if match['id'].startswith(session_id)]
         if not context_chunks:
             return {"answer": "My apologies, I couldn't get you any relevant information according to the query from the uploaded document."}
-            
         context = "\n---\n".join(context_chunks)
 
-        # --- NEW AND IMPROVED PROMPT ---
+        formatted_history = "\n".join([f"{msg.sender}: {msg.text}" for msg in history])
+
+        # --- NEW, SMARTER PROMPT ---
         prompt = f"""
-        **Your Role and Goal:**
-        You are Clari, a friendly and empathetic AI health assistant. Your purpose is to help people understand their medical records. You do this by explaining complex information in simple, clear, and reassuring terms. Try to respond for greetings and gratitude responses from user.
+        **Your Persona:**
+        You are Clari, a friendly, empathetic, and highly intelligent AI health assistant. Your goal is to make medical records easy to understand.
 
-        **Core Instructions:**
-        1.  **Answer from the Document:** Base your entire answer **only** on the information found in the "Context from the Document" below.
-        2.  **Explain, Don't Advise:** Your primary role is to explain using (ABCDE strategy: Analyse, Breakdown, Clarity, Decompose, Explain) what is written in the document.
-            * You **MUST NOT** give new medical advice, provide a personal opinion, or diagnose a condition.
-            * **HOWEVER**, if the document mentions a specific medical term or diagnosis, you **SHOULD** explain what that term means in simple language. It's very important to clarify what is already there. 
-        3.  **Simplify Medical Jargon:** When you see a medical term, medication, or lab result, first explain what it is in simple terms. Then, explain why it's mentioned in the document based on the context.
-        4.  **Be Honest About Missing Information:** If you cannot find the answer in the provided context, you must say: "My apologies, I couldn't get you any relevant information according to the query from the uploaded document." Do not make anything up.
-
-        **Tone and Style:**
-        * Always be gentle, supportive, and reassuring.
-        * There is no word limit; provide a complete and helpful explanation.
-        * Use formatting like bullet points if it makes the answer clearer.
+        **Core Directives:**
+        1.  **Be Conversational:** Do not re-introduce yourself. Use the "Previous Conversation History" to understand the flow of the chat and provide natural, contextual follow-up answers.
+        2.  **Strictly Adhere to the Document:** Your answers must come ONLY from the "Context from the Document" provided. Never invent information.
+        3.  **Explain, Don't Advise (The Smart Way):**
+            * You **MUST NOT** give medical advice, your personal opinion, or make a new diagnosis.
+            * **Crucially:** If the document already contains a diagnosis (like "NSTEMI") or a medication (like "Aspirin"), your primary job is to **explain it clearly**. If the user asks "Did I have a heart attack?" and the document says "Diagnosis: NSTEMI," you should explain, "The document states a diagnosis of NSTEMI, which is a type of heart attack. It is described as..." This is explaining, not diagnosing.
+        4.  **Handle Missing Information Gracefully:** If the answer is not in the context, state it clearly and politely: "My apologies, I couldn't get you any relevant information according to the query from the uploaded document. It might be best to discuss this with your doctor."
+        5.  **Format for Clarity:**
+            * Use **bold text** for medical terms and key concepts.
+            * Use bullet points to break down complex lists (like medications).
+            * Keep responses concise and directly answer the user's question, but provide enough detail to be truly helpful.
 
         ---
+        **Previous Conversation History:**
+        {formatted_history}
+        ---
+
         **Context from the Document:**
         {context}
         ---
 
-        **Question:**
+        **Current Question from User:**
         {question}
 
-        **Answer:**
+        **Your Answer:**
         """
 
         model = genai.GenerativeModel('gemini-1.5-flash-latest')
@@ -188,13 +182,13 @@ async def ask_question_endpoint(request_data: AskRequest):
         raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
 
 
-# --- 5. Static Files and Catch-All Route (No changes here) ---
+# --- 5. Static Files and Catch-All Route ---
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/{catch_all:path}", response_class=FileResponse)
 async def serve_react_app(catch_all: str):
     return FileResponse("static/index.html")
 
-# --- 6. Main execution block (for local testing) ---
+# --- 6. Main execution block ---
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
