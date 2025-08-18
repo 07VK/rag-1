@@ -563,10 +563,16 @@
     border: 1px solid var(--border-subtle);
   }
   
+  /* Add this to the parent container that holds all the messages */
+  #chat-window {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem; /* This now controls the space between bubbles */
+  }
+
   .chat-message {
     display: flex;
-    margin-bottom: 1rem;
-    animation: popIn 0.5s var(--animation-curve-spring) forwards;
+    animation: popIn 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
     opacity: 0;
   }
   @keyframes popIn {
@@ -584,7 +590,8 @@
     border-radius: 20px;
     max-width: 85%;
     line-height: 1.7;
-    box-shadow: var(--shadow-soft);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 
+                0 4px 8px rgba(0, 0, 0, 0.05);
   }
   .user-message {
     justify-content: flex-end;
@@ -601,6 +608,7 @@
     background: white;
     color: var(--text-primary);
     border-bottom-left-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
   }
   .bot-message.typing .message-bubble::after {
     content: "...";

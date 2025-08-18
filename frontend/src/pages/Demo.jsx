@@ -348,8 +348,7 @@ export default function Demo() {
                     key={idx}
                     className={`chat-message ${m.sender === "You" ? "user-message" : "bot-message"} ${m.typing ? "typing" : ""}`}
                   >
-                    <div>
-                      className="message-bubble"
+                    <div className="message-bubble">
                       <ReactMarkdown>{m.text || ""}</ReactMarkdown>
                     </div>
                   </div>
