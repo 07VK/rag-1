@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import ReactMarkdown from 'react-markdown'; // <-- ADD THIS LINE
 
 // Helper function to format the AI's response, handling bolding and newlines
 function formatAnswer(text) {
@@ -218,7 +219,7 @@ export default function Demo() {
                 src="/static/logo.png"
                 alt="ClearChartAI"
                 className="logo-image"
-                style={{ width: "4rem", height: "auto", marginLeft: 0 }}
+                style={{ width: "8rem", height: "8rem", marginLeft: 0 }}
               />
               <div>
                 <h1 className="logo-text" style={{ margin: 0 }}>ClearChartAI</h1>
@@ -269,7 +270,7 @@ export default function Demo() {
               }}
               onClick={processAndSwitch}
             >
-              Process PDF
+              Click to Ask Clari
             </button>
 
             <button
@@ -347,10 +348,10 @@ export default function Demo() {
                     key={idx}
                     className={`chat-message ${m.sender === "You" ? "user-message" : "bot-message"} ${m.typing ? "typing" : ""}`}
                   >
-                    <div
+                    <div>
                       className="message-bubble"
-                      dangerouslySetInnerHTML={{ __html: (m.text || "").replace(/\n/g, "<br>") }}
-                    />
+                      <ReactMarkdown>{m.text || ""}</ReactMarkdown>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -28,7 +28,6 @@ export default function About() {
           </div>
         </a>
       </header>
-
       <section className="about-section" id="about-hero">
         <h1 className="hero-title">Clarity in Complexity.</h1>
         <p className="hero-subtitle">
@@ -56,7 +55,7 @@ export default function About() {
         </div>
       </section>
 
-      <div className="demo-button-wrapper" style={{ marginBottom: "8rem" }}>
+      <div className="demo-button-wrapper" style={{ marginBottom: "4rem" }}>
         <Link to="/demo" className="demo-button" aria-label="Try our Demo AI Synapse">
           Try our Demo AI Synapse
         </Link>
@@ -89,11 +88,11 @@ export default function About() {
         <h2 className="hero-title" style={{ fontSize: "2.8rem" }}>The Team</h2>
         <div className="team-grid">
           <TeamCard img="/static/nicholas-davis.jpg" name="Nicholas Davis" title="Founder & CEO, AGACNP, BSN"
-                    bio="Over 8 years in the medical field, driving the mission with a deep understanding of patient care." />
+                    bio="Over 8 years in the medical field, driving the company’s mission with a deep understanding of patient care." />
           <TeamCard img="/static/dhruv-suraj.jpg" name="Dhruv Suraj" title="Lead AI Engineer"
-                    bio="Leads the stack to keep the platform powerful, intuitive, and reliable." />
+                    bio="Responsible for the entire tech stack, ensuring the platform is powerful, intuitive, and reliable for all users." />
           <TeamCard img="/static/vishnu-koraganji.png" name="Vishnu Koraganji" title="Sr Full-Stack AI Engineer"
-                    bio="Turns complex medical jargon into clear language and designs UI." />
+                    bio="Expert in AI/ML and NLP, translating complex medical jargon into clear, understandable language for users and designing UI." />
         </div>
       </section>
     </div>

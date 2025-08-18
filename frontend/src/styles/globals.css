@@ -113,7 +113,7 @@
   }
   .about-section {
     text-align: center;
-    margin-bottom: 12rem;
+    margin-bottom: 8rem;
     opacity: 0;
     transform: translateY(40px);
     transition: opacity 1s var(--animation-curve-elegant),
@@ -136,7 +136,7 @@
   .hero-subtitle {
     font-size: 1.3rem;
     color: var(--text-secondary);
-    max-width: 700px;
+    max-width: 1000px;
     margin: 0 auto 3rem auto;
     line-height: 1.8;
   }
@@ -729,6 +729,7 @@ textarea#question-input::placeholder {
 
 .suggestions-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0 1rem 0.75rem;
   overflow-x: auto;
