@@ -130,6 +130,7 @@
     letter-spacing: -0.03em;
     background: linear-gradient(45deg, var(--text-primary), var(--text-secondary));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
   }
   .hero-subtitle {
@@ -713,10 +714,11 @@
   text-decoration: underline;
 }
 
-  textarea#question-input::placeholder {
+textarea#question-input::placeholder {
     color: var(--text-secondary);
     opacity: 0.7;
   }
+
 .site-footer {
   width: 100%;
   text-align: center;             /* centers the text */
@@ -762,7 +764,6 @@
   background: white;
 }
 
-
 .upload-area {
   border: 2px dashed var(--border-subtle);
   border-radius: 12px;
@@ -807,4 +808,5 @@
     min-height: auto;
   }
 }
+
   
