@@ -87,7 +87,10 @@ export default function Demo() {
   function onDragLeave(e) {
     e.preventDefault();
     e.stopPropagation();
-    if (e.currentTarget === e.target) setDragActive(false);
+    // Check if leaving the window entirely
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+        setDragActive(false);
+    }
   }
   function onDrop(e) {
     e.preventDefault();
@@ -120,9 +123,8 @@ export default function Demo() {
           { sender: "Bot", text: "The document has been processed. You can now ask questions." },
         ]);
         setSources([selectedFile.name]);
-        // if (json.fileUrl) setPreviewUrl(json.fileUrl);
       } else {
-        throw new Error(json.message || "Failed to process PDF.");
+        throw new Error(json.detail || "Failed to process PDF.");
       }
     } catch (e) {
       setStatus(`Error: ${e.message}`);
@@ -137,16 +139,13 @@ export default function Demo() {
     setShowPreview(false);
   }
 
-  // --- UPDATED: sendQuestion function to include history ---
   async function sendQuestion() {
     const q = question.trim();
     if (!q) return;
 
-    // Prepare history by filtering out any "typing" indicators
     const historyToSend = messages
       .filter(m => !m.typing)
       .map(m => ({
-          // Ensure the sender key matches the backend's Pydantic model
           sender: m.sender === "You" ? "User" : "Bot", 
           text: m.text
       }));
@@ -161,22 +160,22 @@ export default function Demo() {
         body: JSON.stringify({ 
           question: q, 
           session_id: sessionId,
-          history: historyToSend // <-- Send the history
+          history: historyToSend
         }),
       });
       
       if (!res.ok) {
-        // Handle non-200 responses more gracefully
         const errorJson = await res.json();
         throw new Error(errorJson.detail || "An API error occurred.");
       }
 
+      // --- FIX: Parse the JSON response AFTER checking if the request was successful ---
+      const json = await res.json();
+
       setMessages((m) => {
         const updated = [...m];
-        updated[updated.length - 1] = {
-          sender: "Bot",
-          text: res.ok ? json.answer || "" : json.answer || "An error occurred.",
-        };
+        // --- FIX: Use the parsed `json` object to safely get the answer ---
+        updated[updated.length - 1] = { sender: "Bot", text: json.answer || "" };
         return updated;
       });
     } catch (e) {
@@ -210,7 +209,6 @@ export default function Demo() {
 
             <p>Begin by uploading a document to activate the workspace.</p>
 
-            {/* Drag & Drop / Click zone */}
             <div
               className={`upload-area ${dragActive ? "drag-active" : ""}`}
               onClick={onClickPick}
@@ -241,7 +239,6 @@ export default function Demo() {
               </div>
             </div>
 
-            {/* Process */}
             <button
               className="button"
               style={{
@@ -254,7 +251,6 @@ export default function Demo() {
               Process PDF
             </button>
 
-            {/* View in-page */}
             <button
               className="button"
               onClick={openPreview}
@@ -365,7 +361,6 @@ export default function Demo() {
         </section>
       )}
 
-      {/* ---------- PDF Modal (in-page preview) ---------- */}
       {showPreview && previewUrl && (
         <div className="pdf-overlay" onClick={closePreview} role="dialog" aria-modal="true" aria-label="PDF preview">
           <div className="pdf-modal" onClick={(e) => e.stopPropagation()}>
