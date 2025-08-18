@@ -154,9 +154,12 @@ export default function Demo() {
     setShowPreview(false);
   }
 
-  async function sendQuestion() {
-    const q = question.trim();
-    if (!q) return;
+ async function sendQuestion(forcedQ) { 
+  
+  // If `forcedQ` exists (from a bubble click), it uses that.
+  // Otherwise, it uses the `question` from the text input state.
+  const q = (forcedQ || question).trim(); 
+  if (!q) return;
 
     const historyToSend = messages
       .filter(m => !m.typing)
@@ -356,7 +359,12 @@ export default function Demo() {
               {showSuggestions && (
                 <div className="suggestions-row">
                   {SUGGESTED_QUESTIONS.map((q, i) => (
-                    <button key={i} className="suggestion-chip" onClick={() => sendQuestion(q)} title={q}>
+                    <button 
+                      key={i} 
+                      className="suggestion-chip" 
+                      onClick={() => sendQuestion(q)} // <-- This is the key part
+                      title={q}
+                    >
                       {q}
                     </button>
                   ))}

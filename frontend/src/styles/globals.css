@@ -725,13 +725,43 @@
   color: var(--slate-600);
 }
 
-.suggestion-chip:hover { 
-  border-color: var(--medical-teal); 
+.suggestions-row {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0 1rem 0.75rem;
+  overflow-x: auto;
+  /* Hide scrollbar for a cleaner look */
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
-.suggestion-chip:focus { 
-  outline: 2px solid var(--medical-teal); 
-  outline-offset: 2px;
+
+.suggestions-row::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, and Opera */
 }
+
+/* Individual bubble style */
+.suggestion-chip {
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border-subtle, #e0e0e0);
+  background: rgba(255, 255, 255, 0.8); /* Semi-transparent background */
+  box-shadow: 0 2px 5px rgba(0,0,0,.08);
+  font-size: 0.9rem;
+  color: var(--text-primary, #333);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  backdrop-filter: blur(5px); /* Frosted glass effect */
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* Hover effect for the bubbles */
+.suggestion-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,.12);
+  background: white;
+}
+
 
 .upload-area {
   border: 2px dashed var(--border-subtle);
