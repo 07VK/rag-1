@@ -32,8 +32,10 @@ export default function About() {
       <section className="about-section" id="about-hero">
         <h1 className="hero-title">Clarity in Complexity.</h1>
         <p className="hero-subtitle">
-          ClearChartAI's Synapse engine transforms dense medical records into clear, actionable insights. Understand
-          patient histories in seconds, not hours.
+          Healthcare buries you under portals, PDFs, and jargon, ClearChartAI cuts through it all.
+          Our Synapse engine pulls records from every hospital, lab, and clinic, stitching them into one place.
+          It translates dense medical data into clear, actionable insights you can understand in seconds, not hours.
+          No mystery, just your health made simple, secure, and truly yours. We will let you know what to ask next, so your limited time with the doctor counts.
         </p>
 
         <div className="heartbeat-container" role="img" aria-label="EKG heartbeat animation">

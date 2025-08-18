@@ -1,6 +1,21 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+// Helper function to format the AI's response, handling bolding and newlines
+function formatAnswer(text) {
+  if (!text) return "";
+  return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, "<br>");
+}
+// Static list of suggested questions to show the user
+const SUGGESTED_QUESTIONS = [
+  "Give me a plain-English summary of this document.",
+  "What are the key findings?",
+  "List all medications and dosages mentioned.",
+  "Explain the unfamiliar medical terms.",
+  "Which lab results look abnormal and why?",
+  "What questions should I ask my doctor about this?"
+];
+
 export default function Demo() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -120,7 +135,7 @@ export default function Demo() {
         setStatus("Success! Starting chat...");
         setShowChat(true);
         setMessages([
-          { sender: "Bot", text: "The document has been processed. You can now ask questions." },
+          { sender: "Bot", text: "The document has been processed. You can now ask Clari." },
         ]);
         setSources([selectedFile.name]);
       } else {
@@ -186,6 +201,9 @@ export default function Demo() {
       });
     }
   }
+
+  // Logic to determine when to show the suggestion bubbles
+  const showSuggestions = showChat && messages.length <= 1;
 
   return (
     <div className="app-container">
@@ -333,6 +351,18 @@ export default function Demo() {
                   </div>
                 ))}
               </div>
+
+              {/* --- NEW: Suggested question bubbles --- */}
+              {showSuggestions && (
+                <div className="suggestions-row">
+                  {SUGGESTED_QUESTIONS.map((q, i) => (
+                    <button key={i} className="suggestion-chip" onClick={() => sendQuestion(q)} title={q}>
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <footer className="panel-footer">
                 <div className="input-wrapper">
                   <textarea

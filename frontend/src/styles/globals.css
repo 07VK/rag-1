@@ -725,6 +725,14 @@
   color: var(--slate-600);
 }
 
+.suggestion-chip:hover { 
+  border-color: var(--medical-teal); 
+}
+.suggestion-chip:focus { 
+  outline: 2px solid var(--medical-teal); 
+  outline-offset: 2px;
+}
+
 .upload-area {
   border: 2px dashed var(--border-subtle);
   border-radius: 12px;
