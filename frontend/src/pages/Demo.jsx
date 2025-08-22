@@ -301,7 +301,7 @@ export default function Demo() {
             </div>
 
             <Link
-              to="/"
+              to="/about#top"
               className="button"
               style={{ marginTop: "1rem", textDecoration: "none", display: "inline-block" }}
             >
